@@ -1,6 +1,6 @@
 import { graph } from "../graph/graph.js";
 import Conversation from "../model/conversation.model.js";
-import { addMessage, getConversationMessages } from "./conversation.service"
+import { addMessage, getConversationMessages } from "./conversation.service.js"
 
 export const processInterview =async(
     conversationId,
