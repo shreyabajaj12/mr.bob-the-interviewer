@@ -1,14 +1,21 @@
-import { getModel } from "../config/llmModel.js";
+import { getDecider, getModel } from "../config/llmModel.js";
 
 export const router = async (state) => {
 
-const llm = getModel;
+const llm = getDecider;
 
-const history = state.messages.length
+const history = state.messages?.length
     ? state.messages
+        .slice(-6)
         .map(message => `${message.type}: ${message.content}`)
         .join("\n")
     : "No previous interview history.";
+
+if(state.messages.length===0){
+    return {
+        path:"resume"
+    }
+}
 
 const prompt = `
 
