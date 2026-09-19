@@ -1,4 +1,6 @@
-import React, { useState } from "react";
+import React, { useState ,useEffect} from "react";
+import { useNavigate } from "react-router-dom";
+import axios from "axios";
 import {
   Mic,
   MicOff,
@@ -13,7 +15,6 @@ import {
 } from "lucide-react";
 
 import mrBob from "../assets/mr-bob-wt-bg.png";
-import { useEffect } from "react";
 import { useRef } from "react";
 
 const Interview = () => {
@@ -23,30 +24,110 @@ const Interview = () => {
   const [answer, setAnswer] = useState("");
 
   // Temporary data. Later sourced from backend / LangGraph.
-  const [messages, setMessages] = useState([
-    {
-      id: 1,
-      sender: "bob",
-      text: "Hi, I'm Mr. Bob. I'll be taking your technical interview today. Can you tell me about the architecture of your recent software project?",
-    },
-  ]);
+  const [messages, setMessages] = useState([]);
+  const navigate=useNavigate();
+  const [conversationId,setConversationId]=useState(null)
+
+  useEffect(()=>{
+    const validateInterview =async()=>{
+      try{
+        const response =await axios.get(
+          "http://localhost:8000/api/interview/current",
+          {
+            withCredentials: true
+          }
+        )
+        console.log("Interview sesssion:",response.data);
+        setConversationId(response.data.conversationId)
+        setMessages([
+          {
+            id:Date.now(),
+            sender:"bob",
+            text:response.data.question
+          }
+        ])
+      }
+      catch(error){
+        console.error("Invalid interview session");
+
+        navigate("/upload",{
+          replace:true
+        })
+      }
+    };
+    validateInterview();
+  },[navigate]);
+
+const endInterview=async()=>{
+        try {
+             const response =await axios.post(
+          "http://localhost:8000/api/interview/end",{},
+          {
+            withCredentials: true
+          }
+        )
+        console.log("Interview sesssion:",response.data);
+        navigate("/end",{
+          replace:true,
+          state:{
+            transcript:response.data.transcript
+          }
+        })
+
+        } catch (error) {
+            console.error("Failed to end the interview");
+
+            navigate("/upload",{
+            replace:true
+            })
+        }
+}
 
   const currentQuestion =
     messages[messages.length - 1]?.sender === "bob"
       ? messages[messages.length - 1].text
       : "Take a moment to prepare your answer.";
 
-  const handleSendAnswer = () => {
-    if (!answer.trim()) return;
+  const handleSendAnswer = async() => {
+    if (!answer.trim() || !conversationId) return;
 
-    const newMessage = {
-      id: messages.length + 1,
-      sender: "user",
-      text: answer.trim(),
-    };
-
-    setMessages((previous) => [...previous, newMessage]);
-    setAnswer("");
+    const userAnswer=answer.trim();
+    setMessages((previous)=>[
+      ...previous,
+      {
+        id:Date.now(),
+        sender:"user",
+        text:userAnswer,
+      }
+    ])
+    setAnswer("")
+    try{
+      const response =await axios.post(
+        "http://localhost:8000/api/interview/chat",
+        {
+          conversationId:conversationId,
+          answer:userAnswer
+        },
+        {
+          withCredentials:true,
+        }
+      )
+      console.log("next question:",response.data);
+      setMessages((previous)=>[
+        ...previous,
+        {
+          id:Date.now(),
+          sender:"bob",
+          text:response.data.question
+        }
+      ])
+    }
+    catch(error){
+      console.error(
+        "failed to send answer",
+        error.response?.data
+      )
+    }
   };
 
   const handleKeyDown = (event) => {
@@ -125,7 +206,11 @@ const formattedTime =
         </div>
 
         {/* Right Section */}
-        <button className="flex items-center gap-2 rounded-xl border border-[#B9D175]/40 bg-[#450C3F] px-4 py-2.5 text-sm font-bold text-[#F5FBDA] transition hover:bg-[#5C1554] sm:px-5">
+        <button 
+        onClick={endInterview}
+        className="flex
+        cursor-pointer
+        items-center gap-2 rounded-xl border border-[#B9D175]/40 bg-[#450C3F] px-4 py-2.5 text-sm font-bold text-[#F5FBDA] transition hover:bg-[#5C1554] sm:px-5">
           <X size={17} />
           <span className="hidden sm:inline">End Interview</span>
         </button>
@@ -244,10 +329,11 @@ const formattedTime =
               {/* Send Button */}
               <button
                 onClick={handleSendAnswer}
+                cursor-pointer
                 disabled={!answer.trim()}
                 className="flex h-14 shrink-0 items-center gap-2 rounded-2xl bg-[#450C3F] px-5 font-bold text-[#F5FBDA] transition hover:bg-[#5C1554] disabled:cursor-not-allowed disabled:opacity-30 sm:px-6"
               >
-                <span className="hidden sm:inline">Send</span>
+                <span className="cursor-pointer hidden sm:inline">Send</span>
                 <Send size={19} />
               </button>
             </div>

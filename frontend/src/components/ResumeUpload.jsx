@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import {
   Upload,
   FileText,
@@ -9,14 +9,17 @@ import {
   AlertCircle,
   Loader2,
 } from "lucide-react";
-
+import {useNavigate} from "react-router-dom"
+import axios from "axios"
 import * as pdfjsLib from "pdfjs-dist";
 import mammoth from "mammoth";
 
 // PDF worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
 
-const ResumeUpload = ({ onStartInterview }) => {
+const ResumeUpload = () => {
+  const navigate =useNavigate();
+
   const [file, setFile] = useState(null);
   const [resumeText, setResumeText] = useState("");
   const [isDragging, setIsDragging] = useState(false);
@@ -197,15 +200,34 @@ const ResumeUpload = ({ onStartInterview }) => {
   // =====================================================
   // START INTERVIEW
   // =====================================================
+  const [isStarting, setIsStarting] = useState(false);
 
-  const startInterview = () => {
-    if (!resumeText) {
+  const startInterview = async() => {
+    if (!resumeText || isStarting) {
       return;
     }
+    setIsStarting(true);
 
-    if (onStartInterview) {
-      onStartInterview(resumeText);
+    try{
+      const response =await axios.post(
+        "http://localhost:8000/api/interview/start",
+        {
+          resumeText:resumeText,
+        },
+        {
+          withCredentials:true,
+        }
+      );
+      console.log("start interview response:",response.data);
+      navigate("/interview")
+    }catch(error){
+        console.error("failed interview response:",error);
+        setError(
+          error.response?.data?.error || 
+          "failed to start interview. please try again."
+        )
     }
+    setIsStarting(false);
   };
 
   return (
@@ -813,7 +835,9 @@ const ResumeUpload = ({ onStartInterview }) => {
 
               <button
                 onClick={startInterview}
+                disabled={isStarting}
                 className="
+                cursor-pointer
                   group
                   w-full
                   sm:w-auto
