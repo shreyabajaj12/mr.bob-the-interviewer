@@ -27,6 +27,80 @@ const Interview = () => {
   const [messages, setMessages] = useState([]);
   const navigate=useNavigate();
   const [conversationId,setConversationId]=useState(null)
+  const [isBobSpeaking,setIsBobSpeaking]=useState(false)
+  const recognitionRef=useRef(null)
+
+  const speakQuestion =(text)=>{
+    if(!isAudioOn)return;
+    
+    const utterance =new SpeechSynthesisUtterance(text);
+    utterance.rate=0.85;
+    utterance.pitch=1.5;
+    utterance.volume=1;
+
+    utterance.onstart=()=>{
+      setIsBobSpeaking(true);
+    }
+    utterance.onend=()=>{
+      setIsBobSpeaking(false);
+    }
+    utterance.onerror=()=>{
+      setIsBobSpeaking(false);
+    }
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utterance)
+  }
+
+const startListening = () => {
+    const SpeechRecognition =
+        window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+        alert("Speech recognition is not supported in this browser.");
+        return;
+    }
+
+    const recognition = new SpeechRecognition();
+
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = "en-US";
+
+    recognition.onstart = () => {
+        setIsMicOn(true);
+    };
+
+    recognition.onresult = (event) => {
+        let transcript = "";
+
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+            transcript += event.results[i][0].transcript;
+        }
+
+        setAnswer(transcript);
+    };
+
+    recognition.onerror = (event) => {
+        console.error("Speech recognition error:", event.error);
+        setIsMicOn(false);
+    };
+
+    recognition.onend = () => {
+        setIsMicOn(false);
+    };
+
+    recognitionRef.current = recognition;
+
+    recognition.start();
+};
+const stopListening = () => {
+    if (recognitionRef.current) {
+        recognitionRef.current.stop();
+        recognitionRef.current = null;
+    }
+
+    setIsMicOn(false);
+};
 
   useEffect(()=>{
     const validateInterview =async()=>{
@@ -46,6 +120,7 @@ const Interview = () => {
             text:response.data.question
           }
         ])
+        speakQuestion(response.data.question);
       }
       catch(error){
         console.error("Invalid interview session");
@@ -121,6 +196,7 @@ const endInterview=async()=>{
           text:response.data.question
         }
       ])
+      speakQuestion(response.data.question)
     }
     catch(error){
       console.error(
@@ -218,14 +294,14 @@ const formattedTime =
 
       {/* Mobile Controls */}
       <div className="flex shrink-0 items-center justify-center gap-2 border-b border-[#B9D175]/10 bg-[#450C3F] px-4 py-3 md:hidden">
-        <div className="flex items-center gap-2 rounded-xl bg-white/10 px-3 py-2 text-xs">
+        <div className="flex items-center gap-2 rounded-xl bg-[#F5FBDA] px-3 py-2 text-xs">
           <Clock3 size={14} />
-          00:42
+          {formattedTime}
         </div>
 
         <button
           onClick={() => setIsAudioOn(!isAudioOn)}
-          className="flex items-center gap-2 rounded-xl bg-white/10 px-3 py-2 text-xs"
+          className="flex items-center gap-2 rounded-xl bg-[#F5FBDA] px-3 py-2 text-xs cursor-pointer"
         >
           {isAudioOn ? <Volume2 size={14} /> : <VolumeX size={14} />}
           Audio
@@ -233,7 +309,7 @@ const formattedTime =
 
         <button
           onClick={() => setShowHistory(!showHistory)}
-          className="flex items-center gap-2 rounded-xl bg-white/10 px-3 py-2 text-xs"
+          className="flex items-center gap-2 rounded-xl bg-[#F5FBDA] px-3 py-2 text-xs cursor-pointer"
         >
           <History size={14} />
           History
@@ -300,8 +376,8 @@ const formattedTime =
             <div className="mx-auto flex max-w-5xl items-center gap-3">
               {/* Mic Toggle Button */}
               <button
-                onClick={() => setIsMicOn(!isMicOn)}
-                className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-full border transition-all duration-300 ${
+                onClick={isMicOn?stopListening:startListening}
+                className={`flex h-14 w-14 shrink-0  cursor-pointer items-center justify-center rounded-full border transition-all duration-300 ${
                   isMicOn
                     ? "border-[#450C3F] bg-[#450C3F] text-[#F5FBDA] shadow-lg shadow-[#450C3F]/20"
                     : "border-[#450C3F]/10 bg-[#D9EFBD] text-[#450C3F] hover:bg-[#B9D175]"
@@ -329,9 +405,8 @@ const formattedTime =
               {/* Send Button */}
               <button
                 onClick={handleSendAnswer}
-                cursor-pointer
                 disabled={!answer.trim()}
-                className="flex h-14 shrink-0 items-center gap-2 rounded-2xl bg-[#450C3F] px-5 font-bold text-[#F5FBDA] transition hover:bg-[#5C1554] disabled:cursor-not-allowed disabled:opacity-30 sm:px-6"
+                className="cursor-pointer flex h-14 shrink-0 items-center gap-2 rounded-2xl bg-[#450C3F] px-5 font-bold text-[#F5FBDA] transition hover:bg-[#5C1554] disabled:cursor-not-allowed disabled:opacity-30 sm:px-6"
               >
                 <span className="cursor-pointer hidden sm:inline">Send</span>
                 <Send size={19} />
@@ -358,7 +433,7 @@ const formattedTime =
 
               <button
                 onClick={() => setShowHistory(false)}
-                className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 transition hover:bg-white/15"
+                className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 transition hover:bg-white/15 cursor-pointer"
               >
                 <X size={20} />
               </button>
